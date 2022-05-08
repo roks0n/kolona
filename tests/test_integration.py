@@ -4,6 +4,7 @@ import pytest
 
 from kolona import Workers, task, workers
 from kolona.constants import RUNTIME_ONEOFF
+from kolona.exceptions import RetryTask
 from kolona.task import Task
 
 
@@ -63,7 +64,7 @@ async def test_with_retries_exceeded(mocker):
 
     @task(queue=queue, max_retries=2, retry_intervals=[1, 1, 1])
     async def runner():
-        raise Exception("Woopsy")
+        raise Exception("Whoopsy")
 
     await runner.enqueue()
 
@@ -74,11 +75,11 @@ async def test_with_retries_exceeded(mocker):
 
     assert log_spy.info.call_count == 2
     for n, l in enumerate(log_spy.info.mock_calls, start=1):
-        assert l.args[0] == f"Failed to process, retrying task: {n}/2"
+        assert l.args[0] == f"Error occured when processing task runner, retrying: {n}/2"
 
     assert log_spy.warning.call_count == 1
     for n, l in enumerate(log_spy.warning.mock_calls, start=1):
-        assert l.args[0] == "Failed to retry task in 2 attempts"
+        assert l.args[0] == "Error processing task runner in last 2 attempts: Whoopsy"
 
     assert queue.qsize() == 0
 
@@ -112,7 +113,37 @@ async def test_with_retries_ok(mocker):
 
     assert log_spy.info.call_count == 1
     for n, l in enumerate(log_spy.info.mock_calls, start=1):
-        assert l.args[0] == f"Failed to process, retrying task: {n}/3"
+        assert l.args[0] == f"Error occured when processing task runner, retrying: {n}/3"
 
     assert log_spy.warning.call_count == 0
+    assert queue.qsize() == 0
+
+
+@pytest.mark.asyncio
+async def test_with_manually_triggered_retries(mocker):
+    queue = asyncio.Queue()
+
+    log_spy = mocker.spy(workers, "log")
+
+    @task(queue=queue, retry_intervals=[1, 1, 1])
+    async def runner(item, name=None):
+        raise RetryTask
+
+    for _ in range(1):
+        await runner.enqueue(1337, name="Rough")
+
+    worker = Workers(queue, "worker", count=1, runtime=RUNTIME_ONEOFF)
+
+    assert queue.qsize() == 1
+    await asyncio.gather(*worker.get())
+
+    assert log_spy.info.call_count == 3
+    for n, l in enumerate(log_spy.info.mock_calls, start=1):
+        assert l.args[0] == f"Retrying task: {n}/3"
+
+    assert log_spy.warning.call_count == 1
+    for n, l in enumerate(log_spy.warning.mock_calls, start=1):
+        # check if extra kwargs are set as expected
+        assert l.kwargs["extra"] == {"arg_0": 1337, "name": "Rough"}
+
     assert queue.qsize() == 0

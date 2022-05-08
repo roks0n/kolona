@@ -26,12 +26,13 @@ class GlobalTask:
     ):
 
         self.max_retries = max_retries
-        intervals = retry_intervals if retry_intervals else self.retry_intervals
+        self.retry_intervals = retry_intervals if retry_intervals else self.retry_intervals
+
         if max_retries < 3:
-            self.retry_intervals = intervals[:max_retries]
+            self.retry_intervals = self.retry_intervals[:max_retries]
         elif max_retries > 3:
-            self.retry_intervals = intervals + [
-                intervals[-1] for _ in range(len(intervals) - max_retries)
+            self.retry_intervals = self.retry_intervals + [
+                self.retry_intervals[-1] for _ in range(len(self.retry_intervals) - max_retries)
             ]
 
         self.queue = queue
@@ -81,8 +82,6 @@ class Task(GlobalTask):
         """
         Process this specific task
         """
-        # if self.retry_attempt < 2:
-        #     raise Exception(f"failed: {self.retry_attempt}")
         await self.func(*self.args, **self.kwargs)
 
     def is_ready(self):

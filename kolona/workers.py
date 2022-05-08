@@ -2,6 +2,7 @@ import asyncio
 from typing import List
 
 from kolona.constants import RUNTIME_INFINITY, RUNTIME_ONEOFF
+from kolona.exceptions import RetryTask
 from kolona.logger import log
 from kolona.task import Task
 
@@ -41,19 +42,52 @@ class Workers:
 
             try:
                 await task.process()
+            except RetryTask:
+                if task.can_retry():
+                    await task.retry()
+                    log.info(f"Retrying task: {task.retry_attempt}/{task.max_retries}")
+                    continue
+                else:
+                    # task has been retried several times without successfully being processed,
+                    # don't process this task anymore
+                    task.done()
+
+                    extra_info = {}
+                    for nr, arg in enumerate(task.args):
+                        extra_info[f"arg_{nr}"] = arg
+
+                    if task.kwargs:
+                        extra_info.update(task.kwargs)
+
+                    log.warning(
+                        f"Failed to process task {task.func.__name__} in last {task.max_retries} attempts",
+                        extra=extra_info,
+                    )
+                    continue
             except Exception as e:
                 log.exception(e)
                 if task.can_retry():
                     await task.retry()
                     log.info(
-                        f"Failed to process, retrying task: {task.retry_attempt}/{task.max_retries}"
+                        f"Error occured when processing task {task.func.__name__}, retrying: {task.retry_attempt}/{task.max_retries}"
                     )
                     continue
                 else:
                     # task has been retried several times without successfully being processed,
                     # don't process this task anymore
                     task.done()
-                    log.warning(f"Failed to retry task in {task.max_retries} attempts")
+
+                    extra_info = {}
+                    for nr, arg in enumerate(task.args):
+                        extra_info[f"arg_{nr}"] = arg
+
+                    if task.kwargs:
+                        extra_info.update(task.kwargs)
+
+                    log.warning(
+                        f"Error processing task {task.func.__name__} in last {task.max_retries} attempts: {e}",
+                        extra=extra_info,
+                    )
                     continue
             else:
                 # mark task as done when successfully processed
