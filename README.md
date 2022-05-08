@@ -1,6 +1,10 @@
-# Kolona 🚦🚗🚗🚗
+# Kolona
 
 A minimalistic in-memory async Python Task queue.
+
+## Install
+
+`pip install kolona`
 
 ## Features
 

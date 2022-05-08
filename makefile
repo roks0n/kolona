@@ -20,3 +20,12 @@ pip-compile:
 
 pip-upgrade:
 	pip-compile --upgrade requirements.in
+
+cleanup-dist:
+	rm -rf dist
+
+build-package:
+	python -m build
+
+upload-package:
+	python -m twine upload dist/*
