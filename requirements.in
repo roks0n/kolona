@@ -1,0 +1,10 @@
+pytest
+pytest-cov
+flake8
+flake8-import-order
+flake8-print
+flake8-quotes
+black
+isort
+mypi
+pip-tools
