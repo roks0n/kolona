@@ -2,10 +2,9 @@ import asyncio
 
 import pytest
 
-from kolona import workers
+from kolona import Workers, task, workers
 from kolona.constants import RUNTIME_ONEOFF
-from kolona.task import Task, task
-from kolona.workers import Workers
+from kolona.task import Task
 
 
 @pytest.mark.asyncio

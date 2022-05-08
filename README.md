@@ -19,8 +19,7 @@ A minimalistic in-memory async Python Task queue.
 ```py
 import asyncio
 
-from kolona.task import task
-from kolona.workers import Workers
+from kolona import task, Workers
 
 # create a queue
 QUEUE = asyncio.Queue()
