@@ -45,7 +45,7 @@ class Workers:
             except RetryTask:
                 if task.can_retry():
                     await task.retry()
-                    log.info(f"Retrying task: {task.retry_attempt}/{task.max_retries}")
+                    log.info(f"Retrying task {task.func.__name__}: {task.retry_attempt}/{task.max_retries}")
                     continue
                 else:
                     # task has been retried several times without successfully being processed,
