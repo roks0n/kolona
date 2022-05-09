@@ -32,7 +32,7 @@ class GlobalTask:
             self.retry_intervals = self.retry_intervals[:max_retries]
         elif max_retries > 3:
             self.retry_intervals = self.retry_intervals + [
-                self.retry_intervals[-1] for _ in range(len(self.retry_intervals) - max_retries)
+                self.retry_intervals[-1] for _ in range(max_retries - len(self.retry_intervals))
             ]
 
         self.queue = queue

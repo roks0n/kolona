@@ -85,6 +85,39 @@ async def test_with_retries_exceeded(mocker):
 
 
 @pytest.mark.asyncio
+async def test_with_more_than_3retries_exceeded(mocker):
+    """
+    Queue 1 tasks with max_retry set to 6. All retries should fail resulting in:
+    - 6 calls to log.info
+    - 1 call to log.warning
+    """
+    queue = asyncio.Queue()
+
+    log_spy = mocker.spy(workers, "log")
+
+    @task(queue=queue, max_retries=6, retry_intervals=[1, 1, 1])
+    async def runner():
+        raise Exception("Whoopsy")
+
+    await runner.enqueue()
+
+    worker = Workers(queue, "worker", count=1, runtime=RUNTIME_ONEOFF)
+
+    assert queue.qsize() == 1
+    await asyncio.gather(*worker.get())
+
+    assert log_spy.info.call_count == 6
+    for n, l in enumerate(log_spy.info.mock_calls, start=1):
+        assert l.args[0] == f"Error occured when processing task runner, retrying: {n}/6"
+
+    assert log_spy.warning.call_count == 1
+    for n, l in enumerate(log_spy.warning.mock_calls, start=1):
+        assert l.args[0] == "Error processing task runner in last 6 attempts: Whoopsy"
+
+    assert queue.qsize() == 0
+
+
+@pytest.mark.asyncio
 async def test_with_retries_ok(mocker):
     """
     Make first process call raise an exception which should trigger a task retry. On the 1st retry
