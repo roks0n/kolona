@@ -100,7 +100,7 @@ class Task(GlobalTask):
 
     def done(self):
         """
-        Mark this specific  task as complete
+        Mark this specific task as complete
         """
         self.queue.task_done()
 

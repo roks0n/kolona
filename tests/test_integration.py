@@ -85,7 +85,7 @@ async def test_with_retries_exceeded(mocker):
 
 
 @pytest.mark.asyncio
-async def test_with_more_than_3retries_exceeded(mocker):
+async def test_with_more_than_3_retries_exceeded(mocker):
     """
     Queue 1 tasks with max_retry set to 6. All retries should fail resulting in:
     - 6 calls to log.info
@@ -158,7 +158,7 @@ async def test_with_manually_triggered_retries(mocker):
 
     log_spy = mocker.spy(workers, "log")
 
-    @task(queue=queue, retry_intervals=[1, 1, 1])
+    @task(queue=queue, retry_intervals=[0.1, 0.1, 0.1])
     async def runner(item, name=None):
         raise RetryTask
 
@@ -172,7 +172,39 @@ async def test_with_manually_triggered_retries(mocker):
 
     assert log_spy.info.call_count == 3
     for n, l in enumerate(log_spy.info.mock_calls, start=1):
-        assert l.args[0] == f"Retrying task: {n}/3"
+        assert l.args[0] == f"Retrying task runner: {n}/3"
+
+    assert log_spy.warning.call_count == 1
+    for n, l in enumerate(log_spy.warning.mock_calls, start=1):
+        # check if extra kwargs are set as expected
+        assert l.kwargs["extra"] == {"arg_0": 1337, "name": "Rough"}
+
+    assert queue.qsize() == 0
+
+
+@pytest.mark.asyncio
+async def test_with_task_args(mocker):
+    queue = asyncio.Queue()
+
+    log_spy = mocker.spy(workers, "log")
+
+    @task(queue=queue, retry_intervals=[0.1, 0.1, 0.1])
+    async def runner(item, name=None):
+        assert item
+        assert name is not None
+        raise RetryTask
+
+    for _ in range(1):
+        await runner.enqueue(1337, name="Rough")
+
+    worker = Workers(queue, "worker", count=1, runtime=RUNTIME_ONEOFF)
+
+    assert queue.qsize() == 1
+    await asyncio.gather(*worker.get())
+
+    assert log_spy.info.call_count == 3
+    for n, l in enumerate(log_spy.info.mock_calls, start=1):
+        assert l.args[0] == f"Retrying task runner: {n}/3"
 
     assert log_spy.warning.call_count == 1
     for n, l in enumerate(log_spy.warning.mock_calls, start=1):

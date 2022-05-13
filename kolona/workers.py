@@ -3,8 +3,10 @@ from typing import List
 
 from kolona.constants import RUNTIME_INFINITY, RUNTIME_ONEOFF
 from kolona.exceptions import RetryTask
-from kolona.logger import log
+from kolona.logger import get_log
 from kolona.task import Task
+
+log = get_log("workers")
 
 QUEUE: asyncio.Queue = asyncio.Queue()
 
@@ -45,7 +47,9 @@ class Workers:
             except RetryTask:
                 if task.can_retry():
                     await task.retry()
-                    log.info(f"Retrying task {task.func.__name__}: {task.retry_attempt}/{task.max_retries}")
+                    log.info(
+                        f"Retrying task {task.func.__name__}: {task.retry_attempt}/{task.max_retries}"
+                    )
                     continue
                 else:
                     # task has been retried several times without successfully being processed,
@@ -64,6 +68,8 @@ class Workers:
                         extra=extra_info,
                     )
                     continue
+            except asyncio.CancelledError:
+                await task.retry()
             except Exception as e:
                 log.exception(e)
                 if task.can_retry():
