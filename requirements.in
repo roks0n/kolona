@@ -1,5 +1,7 @@
 pytest
+pytest-asyncio
 pytest-cov
+pytest-mock
 flake8
 flake8-import-order
 flake8-print
