@@ -8,7 +8,9 @@ flake8-print
 flake8-quotes
 black
 isort
-mypi
+mypy
+types-docutils
+types-setuptools
 pip-tools
 build
 twine

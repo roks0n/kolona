@@ -12,8 +12,8 @@ black:
 flake8:
 	flake8 .
 
-mypi:
-	mypy .
+mypy:
+	mypy setup.py kolona
 
 pip-compile:
 	pip-compile requirements.in

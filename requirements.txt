@@ -28,8 +28,6 @@ coverage[toml]==6.3.2
     # via pytest-cov
 cryptography==37.0.2
     # via secretstorage
-docopt==0.6.1
-    # via mypi
 docutils==0.18.1
     # via readme-renderer
 flake8==4.0.1
@@ -43,12 +41,6 @@ flake8-print==5.0.0
     # via -r requirements.in
 flake8-quotes==3.3.1
     # via -r requirements.in
-flask==0.10.1
-    # via mypi
-gitdb==4.0.9
-    # via gitpython
-gitpython==0.3.2.RC1
-    # via mypi
 idna==3.3
     # via requests
 importlib-metadata==4.11.3
@@ -59,24 +51,20 @@ iniconfig==1.1.1
     # via pytest
 isort==5.10.1
     # via -r requirements.in
-itsdangerous==2.1.2
-    # via flask
 jeepney==0.8.0
     # via
     #   keyring
     #   secretstorage
-jinja2==3.1.2
-    # via flask
 keyring==23.5.0
     # via twine
-markupsafe==2.1.1
-    # via jinja2
 mccabe==0.6.1
     # via flake8
-mypi==0.0.3
+mypy==0.960
     # via -r requirements.in
 mypy-extensions==0.4.3
-    # via black
+    # via
+    #   black
+    #   mypy
 packaging==21.3
     # via
     #   build
@@ -138,31 +126,32 @@ rich==12.4.0
     # via twine
 secretstorage==3.3.2
     # via keyring
-semantic-version==2.3.0
-    # via mypi
 six==1.16.0
     # via bleach
-smmap==5.0.0
-    # via gitdb
 tomli==2.0.1
     # via
     #   black
     #   build
     #   coverage
+    #   mypy
     #   pep517
     #   pytest
 twine==4.0.0
     # via -r requirements.in
+types-docutils==0.18.3
+    # via -r requirements.in
+types-setuptools==57.4.17
+    # via -r requirements.in
 typing-extensions==4.2.0
-    # via black
+    # via
+    #   black
+    #   mypy
 urllib3==1.26.9
     # via
     #   requests
     #   twine
 webencodings==0.5.1
     # via bleach
-werkzeug==2.1.2
-    # via flask
 wheel==0.37.1
     # via pip-tools
 zipp==3.8.0
