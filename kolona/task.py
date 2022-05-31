@@ -1,4 +1,5 @@
 import asyncio
+from functools import update_wrapper
 from time import time
 from typing import Callable, List, Optional
 
@@ -117,7 +118,7 @@ class Task(GlobalTask):
         return self.retry_attempt < self.max_retries
 
 
-def task(*args, queue=None, max_retries=3, retry_intervals=None, **kargs):
+def task(*args, queue=None, max_retries=3, retry_intervals=None, **kwargs):
     """
     @task decorator wraps a function into a GlobalTask which can create a self-contained task object
     """
@@ -126,6 +127,7 @@ def task(*args, queue=None, max_retries=3, retry_intervals=None, **kargs):
         task = GlobalTask(
             func, queue=queue, max_retries=max_retries, retry_intervals=retry_intervals
         )
+        update_wrapper(task, func)
         return task
 
     return wrapper
