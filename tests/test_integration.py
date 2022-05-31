@@ -212,3 +212,19 @@ async def test_with_task_args(mocker):
         assert l.kwargs["extra"] == {"arg_0": 1337, "name": "Rough"}
 
     assert queue.qsize() == 0
+
+
+@pytest.mark.asyncio
+async def test_decorated_task_retains_original_props():
+    """
+    Decorated taks retains __name__, __doc__ and other magic attributes.
+    """
+    queue = asyncio.Queue()
+
+    @task(queue=queue)
+    async def runner():
+        """docs"""
+        return True
+
+    assert runner.__name__ == "runner"
+    assert runner.__doc__ == "docs"
