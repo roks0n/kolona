@@ -12,7 +12,7 @@ A minimalistic in-memory async Python Task queue.
 - Multiple workers
 - In-memor only (no 3rd party message brokers required)
 - Python native using asyncio
-- Staticly typed
+- Statically typed
 
 ## Example
 
