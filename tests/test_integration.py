@@ -1,4 +1,5 @@
 import asyncio
+from time import time
 
 import pytest
 
@@ -228,3 +229,24 @@ async def test_decorated_task_retains_original_props():
 
     assert runner.__name__ == "runner"
     assert runner.__doc__ == "docs"
+
+
+@pytest.mark.asyncio
+async def test_delay():
+    queue = asyncio.Queue()
+
+    @task(queue=queue)
+    async def runner():
+        pass
+
+    await runner.enqueue(delay=2)
+
+    worker = Workers(queue, "worker", count=1, runtime=RUNTIME_ONEOFF)
+
+    assert queue.qsize() == 1
+
+    start = time()
+    await asyncio.gather(*worker.get())
+    stop = time()
+
+    assert stop - start > 2
