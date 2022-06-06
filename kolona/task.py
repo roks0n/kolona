@@ -1,7 +1,9 @@
 import asyncio
 from functools import update_wrapper
 from time import time
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Union
+
+Seconds = Union[float, int]
 
 
 class GlobalTask:
@@ -13,6 +15,7 @@ class GlobalTask:
     max_retries: int
     retry_intervals: List[int] = [3, 5, 15]
     last_attempt_time = 0
+    delay: Seconds = 0
     func: Optional[Callable] = None
     queue: Optional[asyncio.Queue] = None
 
@@ -24,6 +27,7 @@ class GlobalTask:
         last_attempt_time=0,
         retry_attempt=0,
         retry_intervals: List = None,
+        delay: Seconds = 0,
     ):
 
         self.max_retries = max_retries
@@ -40,8 +44,11 @@ class GlobalTask:
         self.func = func
         self.retry_attempt = retry_attempt
         self.last_attempt_time = last_attempt_time
+        self.delay = delay
 
-    async def enqueue(self, *args, queue: asyncio.Queue = None, **kwargs):
+    async def enqueue(
+        self, *args, queue: asyncio.Queue = None, delay: Optional[Seconds] = None, **kwargs
+    ):
         """
         Enqueue a task adds a self-contained `Task` item into the queue with its own context
         """
@@ -49,6 +56,9 @@ class GlobalTask:
 
         if not q:
             raise Exception("No queue specified")
+
+        if delay is None:
+            delay = self.delay
 
         task_item = Task(
             self.func,
@@ -59,6 +69,7 @@ class GlobalTask:
             last_attempt_time=self.last_attempt_time,
             max_retries=self.max_retries,
             retry_intervals=self.retry_intervals,
+            delay=delay,
         )
         await q.put(task_item)
 
@@ -68,7 +79,9 @@ class Task(GlobalTask):
     Task class holding context and methods for each individual `Task`
     """
 
-    def __init__(self, *args, **kwargs):
+    created_at: float
+
+    def __init__(self, *args, delay: Seconds, **kwargs):
         # get task specific args and kwargs and don't pass them to the parent as it doesn't know
         # what to do with it
         task_args = kwargs.pop("task_args")
@@ -78,6 +91,8 @@ class Task(GlobalTask):
 
         self.args = task_args
         self.kwargs = task_kwargs
+        self.created_at = time()
+        self.delay = delay
 
     async def process(self):
         """
@@ -87,9 +102,14 @@ class Task(GlobalTask):
 
     def is_ready(self):
         """
-        Check if task is ready to be processed. After retrying a `Task` there is a cooldown period
-        during which task can not be processed.
+        Check if task is ready to be processed.
+          * If a task was delayed it's not ready until the time passes.
+          * After retrying a `Task` there is a cooldown period
+            during which task can not be processed.
         """
+        if time() < self.created_at + self.delay:
+            return False
+
         if self.last_attempt_time == 0 or self.retry_attempt == 0:
             return True
 
@@ -118,14 +138,23 @@ class Task(GlobalTask):
         return self.retry_attempt < self.max_retries
 
 
-def task(*args, queue=None, max_retries=3, retry_intervals=None, **kwargs):
+def task(
+    queue: asyncio.Queue = None,
+    max_retries: int = 3,
+    retry_intervals=None,
+    delay: Seconds = 0,
+):
     """
     @task decorator wraps a function into a GlobalTask which can create a self-contained task object
     """
 
     def wrapper(func):
         task = GlobalTask(
-            func, queue=queue, max_retries=max_retries, retry_intervals=retry_intervals
+            func,
+            queue=queue,
+            max_retries=max_retries,
+            retry_intervals=retry_intervals,
+            delay=delay,
         )
         update_wrapper(task, func)
         return task
