@@ -15,7 +15,7 @@ class GlobalTask:
     max_retries: int
     retry_intervals: List[int] = [3, 5, 15]
     last_attempt_time = 0
-    default_delay: Seconds = 0
+    delay: Seconds = 0
     func: Optional[Callable] = None
     queue: Optional[asyncio.Queue] = None
 
@@ -27,7 +27,7 @@ class GlobalTask:
         last_attempt_time=0,
         retry_attempt=0,
         retry_intervals: List = None,
-        default_delay: Seconds = 0,
+        delay: Seconds = 0,
     ):
 
         self.max_retries = max_retries
@@ -44,9 +44,11 @@ class GlobalTask:
         self.func = func
         self.retry_attempt = retry_attempt
         self.last_attempt_time = last_attempt_time
-        self.default_delay = default_delay
+        self.delay = delay
 
-    async def enqueue(self, *args, queue: asyncio.Queue = None, delay: Optional[Seconds] = None, **kwargs):
+    async def enqueue(
+        self, *args, queue: asyncio.Queue = None, delay: Optional[Seconds] = None, **kwargs
+    ):
         """
         Enqueue a task adds a self-contained `Task` item into the queue with its own context
         """
@@ -56,7 +58,7 @@ class GlobalTask:
             raise Exception("No queue specified")
 
         if delay is None:
-            delay = self.default_delay
+            delay = self.delay
 
         task_item = Task(
             self.func,
@@ -67,7 +69,6 @@ class GlobalTask:
             last_attempt_time=self.last_attempt_time,
             max_retries=self.max_retries,
             retry_intervals=self.retry_intervals,
-            default_delay=self.default_delay,
             delay=delay,
         )
         await q.put(task_item)
@@ -79,7 +80,6 @@ class Task(GlobalTask):
     """
 
     created_at: float
-    delay: Seconds
 
     def __init__(self, *args, delay: Seconds, **kwargs):
         # get task specific args and kwargs and don't pass them to the parent as it doesn't know
@@ -142,7 +142,7 @@ def task(
     queue: asyncio.Queue = None,
     max_retries: int = 3,
     retry_intervals=None,
-    default_delay: Seconds = 0,
+    delay: Seconds = 0,
 ):
     """
     @task decorator wraps a function into a GlobalTask which can create a self-contained task object
@@ -154,7 +154,7 @@ def task(
             queue=queue,
             max_retries=max_retries,
             retry_intervals=retry_intervals,
-            default_delay=default_delay,
+            delay=delay,
         )
         update_wrapper(task, func)
         return task
