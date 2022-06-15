@@ -292,3 +292,30 @@ async def test_id_after_retries(mocker):
 
     assert log_spy.warning.call_count == 2
     assert queue.qsize() == 0
+
+
+async def test_max_retry_zero(mocker):
+    """
+    Test if task is executed only once in case max_retry is set to 0
+    """
+    queue = asyncio.Queue()
+
+    log_spy = mocker.spy(workers, "log")
+
+    @task(queue=queue, max_retries=0)
+    async def runner():
+        raise Exception("derp")
+
+    task_id = await runner.enqueue()
+
+    worker = Workers(queue, "worker", count=1, runtime=RUNTIME_ONEOFF)
+
+    assert queue.qsize() == 1
+    await asyncio.gather(*worker.get())
+
+    assert log_spy.warning.call_count == 1
+    for err in log_spy.warning.mock_calls:
+        assert err.args[0] == f"Error processing task runner ({task_id}) in last 0 attempts: derp"
+
+    assert log_spy.warning.call_count == 1
+    assert queue.qsize() == 0
