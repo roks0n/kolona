@@ -1,4 +1,5 @@
 import asyncio
+import re
 from time import time
 
 import pytest
@@ -76,11 +77,13 @@ async def test_with_retries_exceeded(mocker):
 
     assert log_spy.info.call_count == 2
     for n, l in enumerate(log_spy.info.mock_calls, start=1):
-        assert l.args[0] == f"Error occured when processing task runner, retrying: {n}/2"
+        assert re.match(
+            f"Error occured when processing task runner (.*), retrying: {n}/2", l.args[0]
+        )
 
     assert log_spy.warning.call_count == 1
     for n, l in enumerate(log_spy.warning.mock_calls, start=1):
-        assert l.args[0] == "Error processing task runner in last 2 attempts: Whoopsy"
+        assert re.match("Error processing task runner (.*) in last 2 attempts: Whoopsy", l.args[0])
 
     assert queue.qsize() == 0
 
@@ -109,11 +112,13 @@ async def test_with_more_than_3_retries_exceeded(mocker):
 
     assert log_spy.info.call_count == 6
     for n, l in enumerate(log_spy.info.mock_calls, start=1):
-        assert l.args[0] == f"Error occured when processing task runner, retrying: {n}/6"
+        assert re.match(
+            f"Error occured when processing task runner (.*), retrying: {n}/6", l.args[0]
+        )
 
     assert log_spy.warning.call_count == 1
     for n, l in enumerate(log_spy.warning.mock_calls, start=1):
-        assert l.args[0] == "Error processing task runner in last 6 attempts: Whoopsy"
+        assert re.match("Error processing task runner (.*) in last 6 attempts: Whoopsy", l.args[0])
 
     assert queue.qsize() == 0
 
@@ -147,7 +152,9 @@ async def test_with_retries_ok(mocker):
 
     assert log_spy.info.call_count == 1
     for n, l in enumerate(log_spy.info.mock_calls, start=1):
-        assert l.args[0] == f"Error occured when processing task runner, retrying: {n}/3"
+        assert re.match(
+            f"Error occured when processing task runner (.*), retrying: {n}/3", l.args[0]
+        )
 
     assert log_spy.warning.call_count == 0
     assert queue.qsize() == 0
@@ -163,8 +170,7 @@ async def test_with_manually_triggered_retries(mocker):
     async def runner(item, name=None):
         raise RetryTask
 
-    for _ in range(1):
-        await runner.enqueue(1337, name="Rough")
+    task_id = await runner.enqueue(1337, name="Rough")
 
     worker = Workers(queue, "worker", count=1, runtime=RUNTIME_ONEOFF)
 
@@ -173,12 +179,12 @@ async def test_with_manually_triggered_retries(mocker):
 
     assert log_spy.info.call_count == 3
     for n, l in enumerate(log_spy.info.mock_calls, start=1):
-        assert l.args[0] == f"Retrying task runner: {n}/3"
+        assert re.match(f"Retrying task runner (.*): {n}/3", l.args[0])
 
     assert log_spy.warning.call_count == 1
     for n, l in enumerate(log_spy.warning.mock_calls, start=1):
         # check if extra kwargs are set as expected
-        assert l.kwargs["extra"] == {"arg_0": 1337, "name": "Rough"}
+        assert l.kwargs["extra"] == {"task_id": task_id, "arg_0": 1337, "name": "Rough"}
 
     assert queue.qsize() == 0
 
@@ -195,8 +201,7 @@ async def test_with_task_args(mocker):
         assert name is not None
         raise RetryTask
 
-    for _ in range(1):
-        await runner.enqueue(1337, name="Rough")
+    task_id = await runner.enqueue(1337, name="Rough")
 
     worker = Workers(queue, "worker", count=1, runtime=RUNTIME_ONEOFF)
 
@@ -205,12 +210,12 @@ async def test_with_task_args(mocker):
 
     assert log_spy.info.call_count == 3
     for n, l in enumerate(log_spy.info.mock_calls, start=1):
-        assert l.args[0] == f"Retrying task runner: {n}/3"
+        assert re.match(f"Retrying task runner (.*): {n}/3", l.args[0])
 
     assert log_spy.warning.call_count == 1
     for n, l in enumerate(log_spy.warning.mock_calls, start=1):
         # check if extra kwargs are set as expected
-        assert l.kwargs["extra"] == {"arg_0": 1337, "name": "Rough"}
+        assert l.kwargs["extra"] == {"task_id": task_id, "arg_0": 1337, "name": "Rough"}
 
     assert queue.qsize() == 0
 
@@ -250,3 +255,40 @@ async def test_delay():
     stop = time()
 
     assert stop - start > 2
+
+
+async def test_id_after_retries(mocker):
+    """
+    Test if task id is being passed on when it's retried
+    """
+    queue = asyncio.Queue()
+
+    log_spy = mocker.spy(workers, "log")
+
+    @task(queue=queue, retry_intervals=[1, 1, 1])
+    async def runner():
+        raise Exception("derp")
+
+    task_ids = []
+    for _ in range(2):
+        task_ids.append(await runner.enqueue())
+
+    worker = Workers(queue, "worker", count=1, runtime=RUNTIME_ONEOFF)
+
+    assert queue.qsize() == 2
+    await asyncio.gather(*worker.get())
+
+    assert log_spy.info.call_count == 6
+    for err in log_spy.info.mock_calls:
+        errors = [
+            f"Error occured when processing task runner ({task_ids[0]}), retrying: 1/3",
+            f"Error occured when processing task runner ({task_ids[1]}), retrying: 1/3",
+            f"Error occured when processing task runner ({task_ids[0]}), retrying: 2/3",
+            f"Error occured when processing task runner ({task_ids[1]}), retrying: 2/3",
+            f"Error occured when processing task runner ({task_ids[0]}), retrying: 3/3",
+            f"Error occured when processing task runner ({task_ids[1]}), retrying: 3/3",
+        ]
+        assert err.args[0] in errors
+
+    assert log_spy.warning.call_count == 2
+    assert queue.qsize() == 0

@@ -1,7 +1,7 @@
 test:
 	pytest .
 
-format: isort black flake8 mypi
+format: isort black flake8 mypy
 
 isort:
 	isort kolona/ tests/
