@@ -48,7 +48,7 @@ class Workers:
                 if task.can_retry():
                     await task.retry()
                     log.info(
-                        f"Retrying task {task.func.__name__}: {task.retry_attempt}/{task.max_retries}"
+                        f"Retrying task {task.func.__name__} ({task.id}): {task.retry_attempt}/{task.max_retries}",
                     )
                     continue
                 else:
@@ -56,7 +56,7 @@ class Workers:
                     # don't process this task anymore
                     task.done()
 
-                    extra_info = {}
+                    extra_info = {"task_id": task.id}
                     for nr, arg in enumerate(task.args):
                         extra_info[f"arg_{nr}"] = arg
 
@@ -64,7 +64,7 @@ class Workers:
                         extra_info.update(task.kwargs)
 
                     log.warning(
-                        f"Failed to process task {task.func.__name__} in last {task.max_retries} attempts",
+                        f"Failed to process task {task.func.__name__} ({task.id}) in last {task.max_retries} attempts",
                         extra=extra_info,
                     )
                     continue
@@ -75,7 +75,7 @@ class Workers:
                 if task.can_retry():
                     await task.retry()
                     log.info(
-                        f"Error occured when processing task {task.func.__name__}, retrying: {task.retry_attempt}/{task.max_retries}"
+                        f"Error occured when processing task {task.func.__name__} ({task.id}), retrying: {task.retry_attempt}/{task.max_retries}"
                     )
                     continue
                 else:
@@ -83,7 +83,7 @@ class Workers:
                     # don't process this task anymore
                     task.done()
 
-                    extra_info = {}
+                    extra_info = {"task_id": task.id}
                     for nr, arg in enumerate(task.args):
                         extra_info[f"arg_{nr}"] = arg
 
@@ -91,7 +91,7 @@ class Workers:
                         extra_info.update(task.kwargs)
 
                     log.warning(
-                        f"Error processing task {task.func.__name__} in last {task.max_retries} attempts: {e}",
+                        f"Error processing task {task.func.__name__} ({task.id}) in last {task.max_retries} attempts: {e}",
                         extra=extra_info,
                     )
                     continue

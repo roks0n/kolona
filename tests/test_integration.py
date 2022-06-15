@@ -250,3 +250,40 @@ async def test_delay():
     stop = time()
 
     assert stop - start > 2
+
+
+async def test_id_after_retries(mocker):
+    """
+    Test if task id is being passed on when it's retried
+    """
+    queue = asyncio.Queue()
+
+    log_spy = mocker.spy(workers, "log")
+
+    @task(queue=queue, retry_intervals=[1, 1, 1])
+    async def runner():
+        raise Exception("derp")
+
+    task_ids = []
+    for _ in range(2):
+        task_ids.append(await runner.enqueue())
+
+    worker = Workers(queue, "worker", count=1, runtime=RUNTIME_ONEOFF)
+
+    assert queue.qsize() == 2
+    await asyncio.gather(*worker.get())
+
+    assert log_spy.info.call_count == 6
+    for err in log_spy.info.mock_calls:
+        errors = [
+            f"Error occured when processing task runner ({task_ids[0]}), retrying: 1/3",
+            f"Error occured when processing task runner ({task_ids[1]}), retrying: 1/3",
+            f"Error occured when processing task runner ({task_ids[0]}), retrying: 2/3",
+            f"Error occured when processing task runner ({task_ids[1]}), retrying: 2/3",
+            f"Error occured when processing task runner ({task_ids[0]}), retrying: 3/3",
+            f"Error occured when processing task runner ({task_ids[1]}), retrying: 3/3",
+        ]
+        assert err.args[0] in errors
+
+    assert log_spy.warning.call_count == 2
+    assert queue.qsize() == 0

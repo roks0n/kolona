@@ -2,6 +2,7 @@ import asyncio
 from functools import update_wrapper
 from time import time
 from typing import Callable, List, Optional, Union
+from uuid import uuid4
 
 Seconds = Union[float, int]
 
@@ -47,8 +48,13 @@ class GlobalTask:
         self.delay = delay
 
     async def enqueue(
-        self, *args, queue: asyncio.Queue = None, delay: Optional[Seconds] = None, **kwargs
-    ):
+        self,
+        *args,
+        queue: asyncio.Queue = None,
+        delay: Optional[Seconds] = None,
+        id: str = None,
+        **kwargs,
+    ) -> str:
         """
         Enqueue a task adds a self-contained `Task` item into the queue with its own context
         """
@@ -70,8 +76,10 @@ class GlobalTask:
             max_retries=self.max_retries,
             retry_intervals=self.retry_intervals,
             delay=delay,
+            id=id,
         )
         await q.put(task_item)
+        return task_item.id
 
 
 class Task(GlobalTask):
@@ -82,6 +90,10 @@ class Task(GlobalTask):
     created_at: float
 
     def __init__(self, *args, delay: Seconds, **kwargs):
+        # generate a new task id if one is not already assigned
+        task_id = kwargs.pop("id")
+        self.id: str = task_id if task_id else str(uuid4())
+
         # get task specific args and kwargs and don't pass them to the parent as it doesn't know
         # what to do with it
         task_args = kwargs.pop("task_args")
@@ -132,7 +144,7 @@ class Task(GlobalTask):
         self.retry_attempt += 1
         self.last_attempt_time = int(time())
         self.done()
-        await self.enqueue(*self.args, **self.kwargs)
+        await self.enqueue(*self.args, **self.kwargs, id=self.id)
 
     def can_retry(self):
         return self.retry_attempt < self.max_retries
