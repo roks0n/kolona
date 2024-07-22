@@ -319,3 +319,12 @@ async def test_max_retry_zero(mocker):
 
     assert log_spy.warning.call_count == 1
     assert queue.qsize() == 0
+
+
+async def test_calling_task_without_enqueing():
+    @task()
+    async def random_task():
+        return True
+
+    result = await random_task()
+    assert result is True

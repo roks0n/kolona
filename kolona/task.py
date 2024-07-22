@@ -24,10 +24,10 @@ class GlobalTask:
         self,
         func: Callable,
         max_retries: int,
-        queue: asyncio.Queue = None,
+        queue: Optional[asyncio.Queue] = None,
         last_attempt_time=0,
         retry_attempt=0,
-        retry_intervals: List = None,
+        retry_intervals: Optional[List[int]] = None,
         delay: Seconds = 0,
     ):
 
@@ -50,9 +50,9 @@ class GlobalTask:
     async def enqueue(
         self,
         *args,
-        queue: asyncio.Queue = None,
+        queue: Optional[asyncio.Queue] = None,
         delay: Optional[Seconds] = None,
-        id: str = None,
+        id: Optional[str] = None,
         **kwargs,
     ) -> str:
         """
@@ -80,6 +80,9 @@ class GlobalTask:
         )
         await q.put(task_item)
         return task_item.id
+
+    async def __call__(self, *args, **kwargs):
+        return await self.func(*args, **kwargs)
 
 
 class Task(GlobalTask):
@@ -151,7 +154,7 @@ class Task(GlobalTask):
 
 
 def task(
-    queue: asyncio.Queue = None,
+    queue: Optional[asyncio.Queue] = None,
     max_retries: int = 3,
     retry_intervals=None,
     delay: Seconds = 0,
@@ -161,14 +164,22 @@ def task(
     """
 
     def wrapper(func):
-        task = GlobalTask(
+        task_obj = GlobalTask(
             func,
             queue=queue,
             max_retries=max_retries,
             retry_intervals=retry_intervals,
             delay=delay,
         )
-        update_wrapper(task, func)
-        return task
+
+        async def callable_task(*args, **kwargs):
+            if kwargs.pop("enqueue", False):
+                return await task_obj.enqueue(*args, **kwargs)
+            else:
+                return await task_obj(*args, **kwargs)
+
+        update_wrapper(callable_task, func)
+        callable_task.enqueue = task_obj.enqueue
+        return callable_task
 
     return wrapper
